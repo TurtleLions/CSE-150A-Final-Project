@@ -116,14 +116,14 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
     return results
 
 # Run Experiments
-print("Simulating NP1 (With Pity)...")
+print("Simulating NP1 (With Pity)")
 np1_pity = run_simulation(target_np=1, use_hard_pity=True)
-print("Simulating NP1 (No Pity)...")
+print("Simulating NP1 (No Pity)")
 np1_nopity = run_simulation(target_np=1, use_hard_pity=False)
 
-print("Simulating NP5 (With Pity)...")
+print("Simulating NP5 (With Pity)")
 np5_pity = run_simulation(target_np=5, use_hard_pity=True)
-print("Simulating NP5 (No Pity)...")
+print("Simulating NP5 (No Pity)")
 np5_nopity = run_simulation(target_np=5, use_hard_pity=False)
 
 # Visualization
