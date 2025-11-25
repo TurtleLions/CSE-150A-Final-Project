@@ -45,6 +45,10 @@ for _ in range(1000000):
 
 df = pd.DataFrame(data_rows, columns=['Latent_State', 'Roll_11'])
 
+# Save dataset
+output_filename = 'simulation_data.csv'
+df.to_csv(output_filename, index=False)
+
 # Learn Model
 model = DiscreteBayesianNetwork([('Latent_State', 'Roll_11')])
 model.fit(df, estimator=MaximumLikelihoodEstimator)
