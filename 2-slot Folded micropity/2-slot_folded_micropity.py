@@ -12,71 +12,82 @@ PROBS = {'3_CE': 0.40, '3_S': 0.40, '4_CE': 0.12, '4_S': 0.03, '5_CE': 0.04, '5_
 card_types = list(PROBS.keys())
 weights = list(PROBS.values())
 
-def get_folded_weights(missing_gold, missing_servant):
+# Handles specific slot targets
+def get_folded_weights(target_type):
     new_probs = PROBS.copy()
     invalid_prob_sum = 0.0
     
-    # Count up invalid probabilities
-    for card, prob in PROBS.items():
-        is_servant = 'S' in card
-        is_gold = '4' in card or '5' in card
-        
-        fails_gold = missing_gold and not is_gold
-        fails_servant = missing_servant and not is_servant
-        
-        if fails_gold or fails_servant:
-            invalid_prob_sum += prob
-            new_probs[card] = 0.0
-
-    # Find "cheapest" card type to fold invalid probabilities into
-    if missing_gold and missing_servant:
-        target = '4_S'
-    elif missing_gold:
-        target = '4_CE'
-    elif missing_servant:
-        target = '3_S'
+    # Define what a valid card for this slot is
+    if target_type == 'GOLD':
+        target_card = '4_CE' # Cheapest 4*
+        def is_valid(c): return '4' in c or '5' in c
+    elif target_type == 'SERVANT':
+        target_card = '3_S'  # Cheapest servant
+        def is_valid(c): return 'S' in c
     else:
         return list(PROBS.values())
 
-    new_probs[target] += invalid_prob_sum
+    # Count up invalid probabilities
+    for card, prob in PROBS.items():
+        if not is_valid(card):
+            invalid_prob_sum += prob
+            new_probs[card] = 0.0
+
+    # Fold invalid probabilities into the target
+    new_probs[target_card] += invalid_prob_sum
     
     return list(new_probs.values())
 
 # Generate Data
 data_rows = []
-for _ in range(1000000):
-    rolls_10 = np.random.choice(card_types, size=10, p=weights)
-    has_gold = any(('4' in c or '5' in c) for c in rolls_10)
-    has_servant = any(('S' in c) for c in rolls_10)
+for _ in range(100000):
+    rolls_9 = np.random.choice(card_types, size=9, p=weights)
     
-    if has_gold and has_servant:
-        state, w = 'Satisfied', get_folded_weights(False, False)
-    elif not has_gold and has_servant:
-        state, w = 'Need_Gold', get_folded_weights(True, False)
-    elif has_gold and not has_servant:
-        state, w = 'Need_Servant', get_folded_weights(False, True)
+    has_gold_in_9 = any(('4' in c or '5' in c) for c in rolls_9)
+    
+    if has_gold_in_9:
+        gold_state, w_10 = 'Satisfied', weights
     else:
-        state, w = 'Need_Both', get_folded_weights(True, True)
+        gold_state, w_10 = 'Need_Gold', get_folded_weights('GOLD')
         
-    roll_11 = np.random.choice(card_types, p=w)
-    data_rows.append([state, roll_11])
+    roll_10 = np.random.choice(card_types, p=w_10)
+    
+    all_10 = np.append(rolls_9, roll_10)
+    has_servant_in_10 = any(('S' in c) for c in all_10)
+    
+    if has_servant_in_10:
+        servant_state, w_11 = 'Satisfied', weights
+    else:
+        servant_state, w_11 = 'Need_Servant', get_folded_weights('SERVANT')
+        
+    roll_11 = np.random.choice(card_types, p=w_11)
+    
+    data_rows.append([gold_state, roll_10, servant_state, roll_11])
 
-df = pd.DataFrame(data_rows, columns=['Latent_State', 'Roll_11'])
+df = pd.DataFrame(data_rows, columns=['Gold_State', 'Roll_10', 'Servant_State', 'Roll_11'])
 
 # Save dataset
-output_filename = 'simulation_data.csv'
+output_filename = 'simulation_data_dual.csv'
 df.to_csv(output_filename, index=False)
 
 # Learn Model
-model = DiscreteBayesianNetwork([('Latent_State', 'Roll_11')])
+model = DiscreteBayesianNetwork([
+    ('Gold_State', 'Roll_10'),
+    ('Servant_State', 'Roll_11')
+])
 model.fit(df, estimator=MaximumLikelihoodEstimator)
-learned_cpd = model.get_cpds('Roll_11')
 
 # Create Lookup Table for Simulation
-cpd_values = learned_cpd.values 
-state_names = learned_cpd.state_names['Latent_State']
-roll_names = learned_cpd.state_names['Roll_11']
-LEARNED_TABLE = {state: cpd_values[:, i] for i, state in enumerate(state_names)}
+def get_table(node_target, node_parent):
+    cpd = model.get_cpds(node_target)
+    cpd_values = cpd.values 
+    parent_names = cpd.state_names[node_parent]
+    # Map state names to their probability rows
+    return {state: cpd_values[:, i] for i, state in enumerate(parent_names)}
+
+TABLE_GOLD = get_table('Roll_10', 'Gold_State')
+TABLE_SERVANT = get_table('Roll_11', 'Servant_State')
+roll_names = model.get_cpds('Roll_10').state_names['Roll_10'] # Same names for both slots
 
 print("Model Learned. Starting Simulation")
 
@@ -90,11 +101,11 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
         hard_pity_counter = 0
         
         while np_count < target_np:
-            # Roll 1-10
-            batch_10 = np.random.choice(card_types, size=10, p=weights)
-            has_gold, has_servant = False, False
+            batch_9 = np.random.choice(card_types, size=9, p=weights)
+            has_gold = False
+            has_servant = False
             
-            for card in batch_10:
+            for card in batch_9:
                 total_rolls += 1
                 hard_pity_counter += 1
                 
@@ -115,16 +126,37 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
             
             if np_count >= target_np: break
             
-            # Roll 11 (using the BN we got earlier)
-            if has_gold and has_servant: state = 'Satisfied'
-            elif not has_gold and has_servant: state = 'Need_Gold'
-            elif has_gold and not has_servant: state = 'Need_Servant'
-            else: state = 'Need_Both'
+            gold_state = 'Satisfied' if has_gold else 'Need_Gold'
             
             total_rolls += 1
             hard_pity_counter += 1
             
-            roll_11 = np.random.choice(roll_names, p=LEARNED_TABLE[state])
+            # Use BN Table for Roll 10
+            roll_10 = np.random.choice(roll_names, p=TABLE_GOLD[gold_state])
+            
+            is_rate_up = (roll_10 == '5_S') and (np.random.random() < 0.8)
+            
+            if is_rate_up:
+                np_count += 1
+                hard_pity_counter = 0
+            elif use_hard_pity and hard_pity_counter >= 330:
+                np_count += 1
+                hard_pity_counter = 0
+                
+            if np_count >= target_np: break
+
+            # Update flags including Roll 10 for the next check
+            if '4' in roll_10 or '5' in roll_10: has_gold = True
+            if 'S' in roll_10: has_servant = True
+
+            servant_state = 'Satisfied' if has_servant else 'Need_Servant'
+            
+            total_rolls += 1
+            hard_pity_counter += 1
+            
+            # Use BN Table for Roll 11
+            roll_11 = np.random.choice(roll_names, p=TABLE_SERVANT[servant_state])
+            
             is_rate_up = (roll_11 == '5_S') and (np.random.random() < 0.8)
             
             if is_rate_up:
@@ -156,7 +188,7 @@ plt.figure(figsize=(12, 6))
 plt.hist(np1_nopity, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
 plt.hist(np1_pity, bins=50, alpha=0.7, label='Standard Pity (330)', color='blue', density=True)
 plt.axvline(x=330, color='green', linestyle='--', label='Pity Threshold (330)')
-plt.title('Distribution of Rolls Required for NP1 (Rate-Up SSR)')
+plt.title('Distribution of Rolls Required for NP1 (Dual Guarantee)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()
@@ -168,7 +200,7 @@ plt.show()
 plt.figure(figsize=(12, 6))
 plt.hist(np5_nopity, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
 plt.hist(np5_pity, bins=50, alpha=0.7, label='Standard Pity', color='blue', density=True)
-plt.title('Distribution of Rolls Required for NP5 (Max Skills)')
+plt.title('Distribution of Rolls Required for NP5 (Dual Guarantee)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()
