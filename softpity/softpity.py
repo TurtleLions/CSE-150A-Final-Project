@@ -69,19 +69,19 @@ def run_simulation(target_np, use_pity, n_sims=10000):
     return results_counts, pd.DataFrame(observation_log)
 
 # Run Experiments
-print("Simulating NP1 (With Soft Pity)...")
+print("Simulating NP1 (With Soft Pity)")
 np1_pity_counts, np1_pity_log = run_simulation(target_np=1, use_pity=True)
 np1_pity_log.to_csv('observations_np1_pity.csv', index=False)
 
-print("Simulating NP1 (No Pity)...")
+print("Simulating NP1 (No Pity)")
 np1_nopity_counts, np1_nopity_log = run_simulation(target_np=1, use_pity=False)
 np1_nopity_log.to_csv('observations_np1_nohardpity.csv', index=False)
 
-print("Simulating NP5 (With Soft Pity)...")
+print("Simulating NP5 (With Soft Pity)")
 np5_pity_counts, np5_pity_log = run_simulation(target_np=5, use_pity=True)
 np5_pity_log.to_csv('observations_np5_pity.csv', index=False)
 
-print("Simulating NP5 (No Pity)...")
+print("Simulating NP5 (No Pity)")
 np5_nopity_counts, np5_nopity_log = run_simulation(target_np=5, use_pity=False)
 np5_nopity_log.to_csv('observations_np5_nohardpity.csv', index=False)
 

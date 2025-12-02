@@ -17,7 +17,7 @@ class PityModelClassifier:
         self.EPSILON = 1e-12
 
     # Weight helper functions
-    def _get_folded_weights(self, target_type):
+    def get_folded_weights(self, target_type):
         new_probs = self.PROBS.copy()
         invalid_prob_sum = 0.0
         
@@ -42,7 +42,7 @@ class PityModelClassifier:
         new_probs[target_card] += invalid_prob_sum
         return new_probs
 
-    def _get_renorm_weights(self, target_type):
+    def get_renorm_weights(self, target_type):
         valid_weights = {}
         # Validation Logic
         if target_type == 'GOLD':
@@ -70,7 +70,7 @@ class PityModelClassifier:
         return valid_weights
 
     # 2-slot
-    def _calc_ll_2slot(self, sequence, model_type):
+    def calc_ll_2slot(self, sequence, model_type):
         log_likelihood = 0.0
         pity_counter = 0
         current_batch = []
@@ -86,12 +86,12 @@ class PityModelClassifier:
             elif slot_in_batch == 9: # 4* slot
                 has_gold = any(('4' in c or '5' in c) for c in current_batch)
                 if not has_gold:
-                    active_probs = self._get_folded_weights('GOLD') if model_type == 'Folded' else self._get_renorm_weights('GOLD')
+                    active_probs = self.get_folded_weights('GOLD') if model_type == 'Folded' else self.get_renorm_weights('GOLD')
                 current_batch.append(card)
             elif slot_in_batch == 10: # Servant slot
                 has_servant = any('S' in c for c in current_batch)
                 if not has_servant:
-                    active_probs = self._get_folded_weights('SERVANT') if model_type == 'Folded' else self._get_renorm_weights('SERVANT')
+                    active_probs = self.get_folded_weights('SERVANT') if model_type == 'Folded' else self.get_renorm_weights('SERVANT')
                 current_batch = []
 
             # Hard Pity Check
@@ -108,7 +108,7 @@ class PityModelClassifier:
         return log_likelihood
 
     # 1-slot
-    def _calc_ll_1slot(self, sequence, model_type):
+    def calc_ll_1slot(self, sequence, model_type):
         log_likelihood = 0.0
         pity_counter = 0
         current_batch = []
@@ -131,7 +131,7 @@ class PityModelClassifier:
                 elif not has_servant: target = 'SERVANT'
                 
                 if target:
-                    active_probs = self._get_folded_weights(target) if model_type == 'Folded' else self._get_renorm_weights(target)
+                    active_probs = self.get_folded_weights(target) if model_type == 'Folded' else self.get_renorm_weights(target)
                 
                 current_batch = []
 
@@ -149,7 +149,7 @@ class PityModelClassifier:
         return log_likelihood
 
     # Soft pity
-    def _calc_ll_soft(self, sequence):
+    def calc_ll_soft(self, sequence):
         log_likelihood = 0.0
         pity_counter = 0
         
@@ -182,11 +182,11 @@ class PityModelClassifier:
     
     def predict_sequence(self, sequence):
         scores = {
-            '2-slot Folded': self._calc_ll_2slot(sequence, 'Folded'),
-            '2-slot Renormalized': self._calc_ll_2slot(sequence, 'Renormalized'),
-            '1-slot Folded': self._calc_ll_1slot(sequence, 'Folded'),
-            '1-slot Renormalized': self._calc_ll_1slot(sequence, 'Renormalized'),
-            'Soft Pity': self._calc_ll_soft(sequence)
+            '2-slot Folded': self.calc_ll_2slot(sequence, 'Folded'),
+            '2-slot Renormalized': self.calc_ll_2slot(sequence, 'Renormalized'),
+            '1-slot Folded': self.calc_ll_1slot(sequence, 'Folded'),
+            '1-slot Renormalized': self.calc_ll_1slot(sequence, 'Renormalized'),
+            'Soft Pity': self.calc_ll_soft(sequence)
         }
         
         best_model = max(scores, key=scores.get)
@@ -224,7 +224,6 @@ class BatchEvaluator:
         print("===================================================")
         print(f"True Label: {true_label}")
         
-        # Load and Group Data
         df = pd.read_csv(filepath)
 
         # Group by Simulation ID
@@ -239,7 +238,7 @@ class BatchEvaluator:
         print(f"Total Sims: {len(all_sim_ids)} | Train: {len(train_ids)} | Test: {len(test_ids)}")
         print(f"Performing classification on Test Set (N={len(test_ids)})")
         
-        # Filter DF for Test set only
+        # Filter DF for test set only
         test_df = df[df['sim_id'].isin(test_ids)]
         sim_groups = test_df.groupby('sim_id')
         
@@ -268,7 +267,6 @@ class BatchEvaluator:
             if count > 0:
                 print(f"  Predicted {model}: {count}")
                 
-        # Added return statement to pass data for plotting
         return true_label, results
 
 if __name__ == "__main__":
@@ -288,18 +286,17 @@ if __name__ == "__main__":
     print("Starting Batch Evaluation with 80/20 Split")
     print(f"Script Location: {base_dir}")
     
-    # Store aggregated data for plotting
-    aggregated_data = []
+    data = []
     
     for ds in datasets:
         true_lbl, res = evaluator.evaluate_file(ds)
         
         row = res.copy()
         row['True Label'] = true_lbl
-        aggregated_data.append(row)
+        data.append(row)
 
     # Plot
-    df = pd.DataFrame(aggregated_data)
+    df = pd.DataFrame(data)
     
     df.set_index('True Label', inplace=True)
     
