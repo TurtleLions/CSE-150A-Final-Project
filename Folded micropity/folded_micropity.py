@@ -82,15 +82,16 @@ print("Model Learned. Starting Simulation")
 
 # Monte Carlo Simulation
 def run_simulation(target_np, use_hard_pity, n_sims=2000):
-    results = []
+    results_counts = []
+    observation_log = []
     
-    for _ in range(n_sims):
+    for sim_id in range(n_sims):
         np_count = 0
         total_rolls = 0
         hard_pity_counter = 0
         
         while np_count < target_np:
-            # Roll 1-10
+            # First 10 rolls
             batch_10 = np.random.choice(card_types, size=10, p=weights)
             has_gold, has_servant = False, False
             
@@ -98,7 +99,12 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
                 total_rolls += 1
                 hard_pity_counter += 1
                 
-                # Check Pity/Success
+                observation_log.append({
+                    'sim_id': sim_id,
+                    'global_roll_index': total_rolls,
+                    'card': card
+                })
+                
                 is_rate_up = (card == '5_S') and (np.random.random() < 0.8)
                 
                 if is_rate_up:
@@ -108,14 +114,14 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
                     np_count += 1
                     hard_pity_counter = 0
                 
-                if np_count >= target_np: break
-                
                 if '4' in card or '5' in card: has_gold = True
                 if 'S' in card: has_servant = True
+
+                if np_count >= target_np: break
             
             if np_count >= target_np: break
             
-            # Roll 11 (using the BN we got earlier)
+            # Roll 11
             if has_gold and has_servant: state = 'Satisfied'
             elif not has_gold and has_servant: state = 'Need_Gold'
             elif has_gold and not has_servant: state = 'Need_Servant'
@@ -125,6 +131,13 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
             hard_pity_counter += 1
             
             roll_11 = np.random.choice(roll_names, p=LEARNED_TABLE[state])
+            
+            observation_log.append({
+                'sim_id': sim_id,
+                'global_roll_index': total_rolls,
+                'card': roll_11
+            })
+            
             is_rate_up = (roll_11 == '5_S') and (np.random.random() < 0.8)
             
             if is_rate_up:
@@ -134,29 +147,36 @@ def run_simulation(target_np, use_hard_pity, n_sims=2000):
                 np_count += 1
                 hard_pity_counter = 0
                 
-        results.append(total_rolls)
-    return results
+        results_counts.append(total_rolls)
+        
+    return results_counts, pd.DataFrame(observation_log)
 
 # Run Experiments
 print("Simulating NP1 (With Pity)")
-np1_pity = run_simulation(target_np=1, use_hard_pity=True)
+np1_pity_counts, np1_pity_log = run_simulation(target_np=1, use_hard_pity=True)
+np1_pity_log.to_csv('observations_np1_pity.csv', index=False)
+
 print("Simulating NP1 (No Pity)")
-np1_nopity = run_simulation(target_np=1, use_hard_pity=False)
+np1_nopity_counts, np1_nopity_log = run_simulation(target_np=1, use_hard_pity=False)
+np1_nopity_log.to_csv('observations_np1_nohardpity.csv', index=False)
 
 print("Simulating NP5 (With Pity)")
-np5_pity = run_simulation(target_np=5, use_hard_pity=True)
+np5_pity_counts, np5_pity_log = run_simulation(target_np=5, use_hard_pity=True)
+np5_pity_log.to_csv('observations_np5_pity.csv', index=False)
+
 print("Simulating NP5 (No Pity)")
-np5_nopity = run_simulation(target_np=5, use_hard_pity=False)
+np5_nopity_counts, np5_nopity_log = run_simulation(target_np=5, use_hard_pity=False)
+np5_nopity_log.to_csv('observations_np5_nohardpity.csv', index=False)
 
 # Visualization
 sns.set_style("whitegrid")
 
 # NP1 Distribution
 plt.figure(figsize=(12, 6))
-plt.hist(np1_nopity, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
-plt.hist(np1_pity, bins=50, alpha=0.7, label='Standard Pity (330)', color='blue', density=True)
+plt.hist(np1_nopity_counts, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
+plt.hist(np1_pity_counts, bins=50, alpha=0.7, label='Standard Pity (330)', color='blue', density=True)
 plt.axvline(x=330, color='green', linestyle='--', label='Pity Threshold (330)')
-plt.title('Distribution of Rolls Required for NP1 (Rate-Up SSR)')
+plt.title('Distribution of Rolls Required for NP1 (1-slot Folded)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()
@@ -166,9 +186,9 @@ plt.show()
 
 # NP5 Distribution
 plt.figure(figsize=(12, 6))
-plt.hist(np5_nopity, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
-plt.hist(np5_pity, bins=50, alpha=0.7, label='Standard Pity', color='blue', density=True)
-plt.title('Distribution of Rolls Required for NP5 (Max Skills)')
+plt.hist(np5_nopity_counts, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
+plt.hist(np5_pity_counts, bins=50, alpha=0.7, label='Standard Pity', color='blue', density=True)
+plt.title('Distribution of Rolls Required for NP5 (1-slot Folded)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()
@@ -183,8 +203,8 @@ def plot_cdf(data, label, color):
     plt.plot(sorted_data, yvals, label=label, color=color, linewidth=2)
 
 plt.figure(figsize=(12, 6))
-plot_cdf(np1_pity, 'NP1 (With Pity)', 'blue')
-plot_cdf(np1_nopity, 'NP1 (No Pity)', 'red')
+plot_cdf(np1_pity_counts, 'NP1 (With Pity)', 'blue')
+plot_cdf(np1_nopity_counts, 'NP1 (No Pity)', 'red')
 plt.axhline(y=0.5, color='grey', linestyle=':', label='50% Chance')
 plt.axhline(y=0.99, color='black', linestyle=':', label='99% Chance')
 plt.title('Cumulative Probability of Acquiring NP1')
@@ -197,7 +217,7 @@ plt.show()
 
 # Box plot
 plt.figure(figsize=(10, 6))
-data_to_plot = [np1_pity, np1_nopity, np5_pity, np5_nopity]
+data_to_plot = [np1_pity_counts, np1_nopity_counts, np5_pity_counts, np5_nopity_counts]
 labels = ['NP1 (With Pity)', 'NP1 (No Pity)', 'NP5 (With Pity)', 'NP5 (No Pity)']
 plt.boxplot(data_to_plot, labels=labels, patch_artist=True)
 plt.title('Roll Variation: Pity vs No Pity')
