@@ -92,7 +92,7 @@ roll_names = model.get_cpds('Roll_10').state_names['Roll_10'] # Same names for b
 print("Model Learned. Starting Simulation")
 
 # Monte Carlo Simulation
-def run_simulation(target_np, use_hard_pity, n_sims=2000):
+def run_simulation(target_np, use_hard_pity, n_sims=10000):
     results_counts = []
     observation_log = []
     
