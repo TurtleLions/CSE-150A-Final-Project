@@ -34,25 +34,24 @@ def get_renormalized_weights(target_type):
 # Generate Data
 data_rows = []
 for _ in range(100000):
+    # First 9 rolls
     rolls_9 = np.random.choice(card_types, size=9, p=weights)
     
+    # Slot 10
     has_gold_in_9 = any(('4' in c or '5' in c) for c in rolls_9)
-    
     if has_gold_in_9:
         gold_state, w_10 = 'Satisfied', weights
     else:
         gold_state, w_10 = 'Need_Gold', get_renormalized_weights('GOLD')
         
-    roll_10 = np.random.choice(card_types, p=w_10)
-    
-    all_10 = np.append(rolls_9, roll_10)
-    has_servant_in_10 = any(('S' in c) for c in all_10)
-    
-    if has_servant_in_10:
+    # Slot 11
+    has_servant_in_9 = any(('S' in c) for c in rolls_9)
+    if has_servant_in_9:
         servant_state, w_11 = 'Satisfied', weights
     else:
         servant_state, w_11 = 'Need_Servant', get_renormalized_weights('SERVANT')
         
+    roll_10 = np.random.choice(card_types, p=w_10)
     roll_11 = np.random.choice(card_types, p=w_11)
     
     data_rows.append([gold_state, roll_10, servant_state, roll_11])
@@ -96,8 +95,9 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
         while np_count < target_np:
             # First 9 rolls
             batch_9 = np.random.choice(card_types, size=9, p=weights)
-            has_gold = False
-            has_servant = False
+            
+            has_gold_in_9 = False
+            has_servant_in_9 = False
             
             for card in batch_9:
                 total_rolls += 1
@@ -119,16 +119,17 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
                     np_count += 1
                     hard_pity_counter = 0
                 
-                if '4' in card or '5' in card: has_gold = True
-                if 'S' in card: has_servant = True
+                if '4' in card or '5' in card: has_gold_in_9 = True
+                if 'S' in card: has_servant_in_9 = True
 
                 if np_count >= target_np: break
             
             if np_count >= target_np: break
             
-            # Roll 10
-            gold_state = 'Satisfied' if has_gold else 'Need_Gold'
+            gold_state = 'Satisfied' if has_gold_in_9 else 'Need_Gold'
+            servant_state = 'Satisfied' if has_servant_in_9 else 'Need_Servant'
             
+            # Roll 10
             total_rolls += 1
             hard_pity_counter += 1
             
@@ -148,15 +149,10 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
             elif use_hard_pity and hard_pity_counter >= 330:
                 np_count += 1
                 hard_pity_counter = 0
-
-            if '4' in roll_10 or '5' in roll_10: has_gold = True
-            if 'S' in roll_10: has_servant = True
             
             if np_count >= target_np: break
             
             # Roll 11
-            servant_state = 'Satisfied' if has_servant else 'Need_Servant'
-            
             total_rolls += 1
             hard_pity_counter += 1
             

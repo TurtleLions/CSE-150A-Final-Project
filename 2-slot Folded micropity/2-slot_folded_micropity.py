@@ -43,23 +43,21 @@ data_rows = []
 for _ in range(100000):
     rolls_9 = np.random.choice(card_types, size=9, p=weights)
     
+    # Slot 10
     has_gold_in_9 = any(('4' in c or '5' in c) for c in rolls_9)
-    
     if has_gold_in_9:
         gold_state, w_10 = 'Satisfied', weights
     else:
         gold_state, w_10 = 'Need_Gold', get_folded_weights('GOLD')
         
-    roll_10 = np.random.choice(card_types, p=w_10)
-    
-    all_10 = np.append(rolls_9, roll_10)
-    has_servant_in_10 = any(('S' in c) for c in all_10)
-    
-    if has_servant_in_10:
+    # Slot 11
+    has_servant_in_9 = any(('S' in c) for c in rolls_9)
+    if has_servant_in_9:
         servant_state, w_11 = 'Satisfied', weights
     else:
         servant_state, w_11 = 'Need_Servant', get_folded_weights('SERVANT')
         
+    roll_10 = np.random.choice(card_types, p=w_10)
     roll_11 = np.random.choice(card_types, p=w_11)
     
     data_rows.append([gold_state, roll_10, servant_state, roll_11])
@@ -82,12 +80,11 @@ def get_table(node_target, node_parent):
     cpd = model.get_cpds(node_target)
     cpd_values = cpd.values 
     parent_names = cpd.state_names[node_parent]
-    # Map state names to their probability rows
     return {state: cpd_values[:, i] for i, state in enumerate(parent_names)}
 
 TABLE_GOLD = get_table('Roll_10', 'Gold_State')
 TABLE_SERVANT = get_table('Roll_11', 'Servant_State')
-roll_names = model.get_cpds('Roll_10').state_names['Roll_10'] # Same names for both slots
+roll_names = model.get_cpds('Roll_10').state_names['Roll_10']
 
 print("Model Learned. Starting Simulation")
 
@@ -101,22 +98,23 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
         total_rolls = 0
         hard_pity_counter = 0
         
-        # First 9 rolls
+        # Simulation Loop
         while np_count < target_np:
+            # First 9 rolls
             batch_9 = np.random.choice(card_types, size=9, p=weights)
-            has_gold = False
-            has_servant = False
+            
+            has_gold_in_9 = False
+            has_servant_in_9 = False
             
             for card in batch_9:
                 total_rolls += 1
                 hard_pity_counter += 1
                 
                 observation_log.append({
-                    'sim_id': sim_id,
-                    'global_roll_index': total_rolls,
-                    'card': card
+                    'sim_id': sim_id, 'global_roll_index': total_rolls, 'card': card
                 })
                 
+                # Check for rate up / pity
                 is_rate_up = (card == '5_S') and (np.random.random() < 0.8)
                 if is_rate_up:
                     np_count += 1
@@ -125,24 +123,25 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
                     np_count += 1
                     hard_pity_counter = 0
                 
-                if '4' in card or '5' in card: has_gold = True
-                if 'S' in card: has_servant = True
+                # Update State Trackers
+                if '4' in card or '5' in card: has_gold_in_9 = True
+                if 'S' in card: has_servant_in_9 = True
                 
                 if np_count >= target_np: break
             
             if np_count >= target_np: break
             
-            gold_state = 'Satisfied' if has_gold else 'Need_Gold'
+            gold_state = 'Satisfied' if has_gold_in_9 else 'Need_Gold'
+            servant_state = 'Satisfied' if has_servant_in_9 else 'Need_Servant'
+            
+            # Roll 10
             total_rolls += 1
             hard_pity_counter += 1
             
-            # Roll 10
             roll_10 = np.random.choice(roll_names, p=TABLE_GOLD[gold_state])
             
             observation_log.append({
-                'sim_id': sim_id,
-                'global_roll_index': total_rolls,
-                'card': roll_10
+                'sim_id': sim_id, 'global_roll_index': total_rolls, 'card': roll_10
             })
             
             is_rate_up = (roll_10 == '5_S') and (np.random.random() < 0.8)
@@ -153,22 +152,16 @@ def run_simulation(target_np, use_hard_pity, n_sims=10000):
                 np_count += 1
                 hard_pity_counter = 0
                 
-            if '4' in roll_10 or '5' in roll_10: has_gold = True
-            if 'S' in roll_10: has_servant = True
-            
             if np_count >= target_np: break
 
-            servant_state = 'Satisfied' if has_servant else 'Need_Servant'
+            # Roll 11
             total_rolls += 1
             hard_pity_counter += 1
             
-            # Roll 11
             roll_11 = np.random.choice(roll_names, p=TABLE_SERVANT[servant_state])
             
             observation_log.append({
-                'sim_id': sim_id,
-                'global_roll_index': total_rolls,
-                'card': roll_11
+                'sim_id': sim_id, 'global_roll_index': total_rolls, 'card': roll_11
             })
             
             is_rate_up = (roll_11 == '5_S') and (np.random.random() < 0.8)
@@ -207,7 +200,7 @@ plt.figure(figsize=(12, 6))
 plt.hist(np1_nopity_counts, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
 plt.hist(np1_pity_counts, bins=50, alpha=0.7, label='Standard Pity (330)', color='blue', density=True)
 plt.axvline(x=330, color='green', linestyle='--', label='Pity Threshold (330)')
-plt.title('Distribution of Rolls Required for NP1 (2-slot Folded Guarantee)')
+plt.title('Distribution of Rolls Required for NP1 (2-slot Folded)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()
@@ -219,7 +212,7 @@ plt.show()
 plt.figure(figsize=(12, 6))
 plt.hist(np5_nopity_counts, bins=50, alpha=0.5, label='No Hard Pity', color='red', density=True)
 plt.hist(np5_pity_counts, bins=50, alpha=0.7, label='Standard Pity', color='blue', density=True)
-plt.title('Distribution of Rolls Required for NP5 (2-slot Folded Guarantee)')
+plt.title('Distribution of Rolls Required for NP5 (2-slot Folded)')
 plt.xlabel('Number of Rolls')
 plt.ylabel('Probability Density')
 plt.legend()

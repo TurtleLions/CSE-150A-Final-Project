@@ -1,0 +1,47 @@
+===================================================
+True Label: 2-slot Folded
+Total Sims: 10000 | Train: 8000 | Test: 2000
+Performing classification on Test Set (N=2000)
+Test Set Accuracy: 87.70%
+Confusion Breakdown (Predictions on Test Set):
+  Predicted 2-slot Folded: 1754
+  Predicted 2-slot Renormalized: 246
+===================================================
+True Label: 2-slot Renormalized
+Total Sims: 10000 | Train: 8000 | Test: 2000
+Performing classification on Test Set (N=2000)
+Test Set Accuracy: 79.85%
+Confusion Breakdown (Predictions on Test Set):
+  Predicted 2-slot Folded: 403
+  Predicted 2-slot Renormalized: 1597
+===================================================
+True Label: 1-slot Folded
+Total Sims: 10000 | Train: 8000 | Test: 2000
+Performing classification on Test Set (N=2000)
+Test Set Accuracy: 86.20%
+Confusion Breakdown (Predictions on Test Set):
+  Predicted 2-slot Folded: 31
+  Predicted 2-slot Renormalized: 12
+  Predicted 1-slot Folded: 1724
+  Predicted 1-slot Renormalized: 233
+===================================================
+True Label: 1-slot Renormalized
+Total Sims: 10000 | Train: 8000 | Test: 2000
+Performing classification on Test Set (N=2000)
+Test Set Accuracy: 76.15%
+Confusion Breakdown (Predictions on Test Set):
+  Predicted 2-slot Folded: 23
+  Predicted 2-slot Renormalized: 12
+  Predicted 1-slot Folded: 442
+  Predicted 1-slot Renormalized: 1523
+===================================================
+True Label: Soft Pity
+Total Sims: 10000 | Train: 8000 | Test: 2000
+Performing classification on Test Set (N=2000)
+Test Set Accuracy: 93.55%
+Confusion Breakdown (Predictions on Test Set):
+  Predicted 2-slot Folded: 50
+  Predicted 2-slot Renormalized: 22
+  Predicted 1-slot Folded: 31
+  Predicted 1-slot Renormalized: 26
+  Predicted Soft Pity: 1871

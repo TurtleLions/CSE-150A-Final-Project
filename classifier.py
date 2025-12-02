@@ -89,7 +89,8 @@ class PityModelClassifier:
                     active_probs = self.get_folded_weights('GOLD') if model_type == 'Folded' else self.get_renorm_weights('GOLD')
                 current_batch.append(card)
             elif slot_in_batch == 10: # Servant slot
-                has_servant = any('S' in c for c in current_batch)
+                has_servant = any('S' in c for c in current_batch[:-1]) 
+                
                 if not has_servant:
                     active_probs = self.get_folded_weights('SERVANT') if model_type == 'Folded' else self.get_renorm_weights('SERVANT')
                 current_batch = []
