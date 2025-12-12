@@ -229,19 +229,9 @@ class BatchEvaluator:
 
         # Group by Simulation ID
         all_sim_ids = df['sim_id'].unique()
+        print(f"Total sims: {len(all_sim_ids)}")
         
-        # 80/20 Split
-        np.random.shuffle(all_sim_ids)
-        split_idx = int(len(all_sim_ids) * 0.8)
-        train_ids = all_sim_ids[:split_idx]
-        test_ids = all_sim_ids[split_idx:]
-        
-        print(f"Total Sims: {len(all_sim_ids)} | Train: {len(train_ids)} | Test: {len(test_ids)}")
-        print(f"Performing classification on Test Set (N={len(test_ids)})")
-        
-        # Filter DF for test set only
-        test_df = df[df['sim_id'].isin(test_ids)]
-        sim_groups = test_df.groupby('sim_id')
+        sim_groups = df.groupby('sim_id')
         
         results = {
             '2-slot Folded': 0, '2-slot Renormalized': 0,
